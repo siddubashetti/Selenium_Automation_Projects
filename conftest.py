@@ -1,18 +1,23 @@
 import pytest
+import os
+import tempfile
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
-import tempfile
 
 @pytest.fixture()
 def driver():
     chrome_options = Options()
-    
-    # Use a fresh temporary profile - no saved passwords!
-    temp_profile = tempfile.mkdtemp()
-    chrome_options.add_argument(f"--user-data-dir={temp_profile}")
-    
+
+    # Required for GitHub Actions (Linux - no display)
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920,1080")
+
+    # Disable popups
     chrome_options.add_argument("--disable-notifications")
     chrome_options.add_argument("--disable-popup-blocking")
     chrome_options.add_argument("--disable-infobars")
@@ -32,7 +37,7 @@ def driver():
     driver.implicitly_wait(10)
     yield driver
     driver.quit()
-    
+
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     outcome = yield
@@ -42,13 +47,8 @@ def pytest_runtest_makereport(item, call):
 @pytest.fixture(autouse=True)
 def take_screenshot_on_failure(request, driver):
     yield
-    # Take screenshot only if test failed
     if request.node.rep_call.failed:
-        # Create screenshots folder if not exists
-        import os
         os.makedirs("reports/screenshots", exist_ok=True)
-        
-        # Save screenshot with test name
         screenshot_name = f"reports/screenshots/{request.node.name}.png"
         driver.save_screenshot(screenshot_name)
         print(f"Screenshot saved: {screenshot_name}")
